@@ -5,3 +5,8 @@ authors = ["Lucas Bittencourt <lbittencs@gmail.com>"]
 
 [dependencies]
 cgmath = "0.15"
+ggez = "0.3.3"
+noisy_float = "0.1.2"
+
+[profile.release]
+debug = true

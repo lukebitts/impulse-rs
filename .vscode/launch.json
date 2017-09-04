@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug",
+            "program": "${workspaceRoot}/target/debug/physics_engine",
+            "args": [],
+            "cwd": "${workspaceRoot}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Release",
+            "program": "${workspaceRoot}/target/release/physics_engine",
+            "args": [],
+            "cwd": "${workspaceRoot}"
+        }
+    ]
+}
