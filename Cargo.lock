@@ -1,10 +1,10 @@
 [root]
-name = "physics_engine"
+name = "impulse_rs"
 version = "0.1.0"
 dependencies = [
  "cgmath 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ggez 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "noisy_float 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rayon 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -580,14 +580,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "noisy_float"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "num-traits 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "num"
 version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1009,7 +1001,6 @@ dependencies = [
 "checksum miniz-sys 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "28eaee17666671fa872e567547e8428e83308ebe5808cdf6a0e28397dbe2c726"
 "checksum msdos_time 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "65ba9d75bcea84e07812618fedf284a64776c2f2ea0cad6bca7f69739695a958"
 "checksum nodrop 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "52cd74cd09beba596430cc6e3091b74007169a56246e1262f0ba451ea95117b2"
-"checksum noisy_float 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9b8bccbcd34c22485ea7b7b72691d0a33c715ee2203605981a33d6bad719d438"
 "checksum num 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)" = "a311b77ebdc5dd4cf6449d81e4135d9f0e3b153839ac90e648a8ef538f923525"
 "checksum num-integer 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)" = "d1452e8b06e448a07f0e6ebb0bb1d92b8890eea63288c0b627331d53514d0fba"
 "checksum num-iter 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)" = "7485fcc84f85b4ecd0ea527b14189281cf27d60e583ae65ebc9c088b13dffe01"

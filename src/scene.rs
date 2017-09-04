@@ -1,9 +1,9 @@
-use super::types::{Real, UnsafeVec2, Vec2};
+use super::types::{Real, Vec2};
 use super::{Body, Shape};
-use super::collision::{self, cross_real_vector, Manifold, ManifoldData};
-use super::body::cross_vectors;
+use super::collision::{self, Manifold, ManifoldData};
+use super::operations::{cross_vectors, cross_real_vector, float_cmp};
 use cgmath::{dot, InnerSpace};
-use noisy_float::types::n32;
+use rayon::prelude::*;
 
 pub static GRAVITY : [f32; 2] = [0.0, 500.0];
 pub static EPSILON : f32 = 0.0001;
@@ -17,15 +17,10 @@ pub struct Scene {
 
 pub type BodyIndex = usize;
 
-// Equal
-fn float_cmp(a: Real, b: Real) -> bool {
-    n32((a - b).raw().abs()) <= EPSILON
-}
-
 impl Scene {
     pub fn new() -> Self {
         Scene {
-            delta: n32(0.0),
+            delta: 0.0,
             iterations: 10,
             bodies: vec![],
         }
@@ -65,13 +60,55 @@ impl Scene {
         }
 
         for body in &mut self.bodies {
-            body.force = Vec2::new(n32(0.0), n32(0.0));
-            body.torque = n32(0.0);
+            body.force = Vec2::new(0.0, 0.0);
+            body.torque = 0.0;
         }
     }
 
     fn generate_contact_list(&self) -> Vec<ManifoldData> {
+        /*use std::sync::Mutex;
+        let contacts = Mutex::new(Vec::new());
+
+        let indexed_bodies = self.bodies.iter().enumerate().collect::<Vec<_>>();
+        indexed_bodies.par_iter().for_each(|&(i, body_a)|{
+            let mut ret = Vec::new();
+
+            for &(j, body_b) in indexed_bodies.iter().skip(i + 1) {
+                if body_a.inv_mass == 0.0 && body_b.inv_mass == 0.0 {
+                    return
+                }
+
+                if let Some(manifold_data) = match (&body_a.shape, &body_b.shape) {
+                    (&Shape::Circle { radius: r1 }, &Shape::Circle { radius: r2 }) => {
+                        collision::circle_circle(
+                            (i, r1, body_a),
+                            (j, r2, body_b)
+                        ) 
+                    }
+                    (&Shape::Circle { radius }, &Shape::Polygon { ref orientation, ref vertices }) => {
+                        collision::circle_polygon(
+                            (i, radius, body_a),
+                            (j, orientation, vertices, body_b)
+                        )
+                    }
+                    (&Shape::Polygon { ref orientation, ref vertices }, &Shape::Circle { radius }) => {
+                        collision::circle_polygon(
+                            (j, radius, body_b),
+                            (i, orientation, vertices, body_a)
+                        )
+                    }
+                    _ => unimplemented!()
+                } {
+                    ret.push(manifold_data);
+                }
+            }
+            contacts.lock().unwrap().extend(ret);
+        });
+        contacts.into_inner().unwrap()
+        */
+
         let mut ret = Vec::new();
+
         for (i, body_a) in self.bodies.iter().enumerate() {
             for (j, body_b) in self.bodies.iter().enumerate().skip(i + 1) {
                 if body_a.inv_mass == 0.0 && body_b.inv_mass == 0.0 {
@@ -86,6 +123,23 @@ impl Scene {
                             ret.push(manifold_data);
                         }
                     }
+                    (&Shape::Circle { radius }, &Shape::Polygon { ref orientation, ref vertices }) => {
+                        if let Some( manifold_data) = collision::circle_polygon(
+                            (i, radius, body_a),
+                            (j, orientation, vertices, body_b)
+                        ) {
+                            ret.push(manifold_data);
+                        }
+                    }
+                    (&Shape::Polygon { ref orientation, ref vertices }, &Shape::Circle { radius }) => {
+                        if let Some(manifold_data) = collision::circle_polygon(
+                            (j, radius, body_b),
+                            (i, orientation, vertices, body_a)
+                        ) {
+                            ret.push(manifold_data);
+                        }
+                    }
+                    _ => unimplemented!()
                 }
             }
         }
@@ -113,10 +167,10 @@ impl Scene {
         let (i_a, i_b) = m.pair;
         let (body_a, body_b) = self.get_two_mut(i_a, i_b);
 
-        if float_cmp(body_a.inv_mass + body_b.inv_mass, n32(0.0)) {
+        if float_cmp(body_a.inv_mass + body_b.inv_mass, 0.0) {
             //InfiniteMassCorrection
-            body_a.velocity = Vec2::new(n32(0.0), n32(0.0));
-            body_b.velocity = Vec2::new(n32(0.0), n32(0.0));
+            body_a.velocity = Vec2::new(0.0, 0.0);
+            body_b.velocity = Vec2::new(0.0, 0.0);
 
             return
         }
@@ -129,10 +183,7 @@ impl Scene {
                 let rv = body_b.velocity + cross_real_vector(body_b.angular_velocity, rb) -
                          body_a.velocity - cross_real_vector(body_a.angular_velocity, ra);
 
-                let unsafe_rv = UnsafeVec2::new(rv.x.raw(), rv.y.raw());
-                let unsafe_normal = UnsafeVec2::new(m.normal.x.raw(), m.normal.y.raw());
-
-                let contact_vel = n32(dot(unsafe_rv, unsafe_normal));
+                let contact_vel = dot(rv, m.normal);
                 if contact_vel > 0.0 {
                     return
                 }
@@ -142,10 +193,10 @@ impl Scene {
                 
                 let inv_mass_sum = 
                     body_a.inv_mass + body_b.inv_mass +
-                    n32(ra_cross_n.raw().powi(2)) * body_a.inv_inertia +
-                    n32(rb_cross_n.raw().powi(2)) * body_b.inv_inertia;
+                    ra_cross_n.powi(2) * body_a.inv_inertia +
+                    rb_cross_n.powi(2) * body_b.inv_inertia;
                 
-                let j = -(n32(1.0) + m.e) * contact_vel / inv_mass_sum / n32(m.contacts.len() as f32);
+                let j = -(1.0 + m.e) * contact_vel / inv_mass_sum / m.contacts.len() as f32;
                 (inv_mass_sum, j, m.normal * j)
             };
 
@@ -160,25 +211,25 @@ impl Scene {
 
                 // Vec2 t = rv - (normal * Dot( rv, normal ));
                 // t.Normalize( );
-                let unsafe_rv = UnsafeVec2::new(rv.x.raw(), rv.y.raw());
-                let unsafe_normal = UnsafeVec2::new(m.normal.x.raw(), m.normal.y.raw());
+                //let unsafe_rv = UnsafeVec2::new(rv.x, rv.y);
+                //let unsafe_normal = UnsafeVec2::new(m.normal.x, m.normal.y);
                 
-                let mut unsafe_t = unsafe_rv - (unsafe_normal * dot(unsafe_rv, unsafe_normal));
-                let len_t = unsafe_t.magnitude();
+                let mut t = rv - (m.normal * dot(rv, m.normal));
+                let len_t = t.magnitude();
                 //if len_t is too small we can't normalize the vector, since it would divide by zero
-                if !float_cmp(n32(len_t), n32(0.0)) {
-                    unsafe_t = unsafe_t.normalize();
+                if !float_cmp(len_t, 0.0) {
+                    t = t.normalize();
                 }
-                let t = Vec2::new(n32(unsafe_t.x), n32(unsafe_t.y));
 
-                let unsafe_rv_dot_unsafe_t = dot(unsafe_rv, unsafe_t);
-                let jt = -n32(unsafe_rv_dot_unsafe_t) / inv_mass_sum / n32(m.contacts.len() as f32);
+                //let t = Vec2::new(unsafe_t.x, unsafe_t.y);
 
-                if float_cmp(jt, n32(0.0)) {
+                let jt = -dot(rv, t) / inv_mass_sum / m.contacts.len() as f32;
+
+                if float_cmp(jt, 0.0) {
                     return
                 }
 
-                if n32(jt.raw().abs()) < j * m.sf {
+                if jt.abs() < j * m.sf {
                     t * jt
                 } else {
                     t * -j * m.df
@@ -197,9 +248,7 @@ impl Scene {
         let k_slop = 0.05;
         let percent = 0.4;
 
-        let unsafe_normal = UnsafeVec2::new(m.normal.x.raw(), m.normal.y.raw());
-        let unsafe_correction = ((m.penetration - k_slop).raw().max(0.0) / (body_a.inv_mass.raw() + body_b.inv_mass.raw())) * unsafe_normal * percent;
-        let correction = Vec2::new(n32(unsafe_correction.x), n32(unsafe_correction.y));
+        let correction = ((m.penetration - k_slop).max(0.0) / (body_a.inv_mass + body_b.inv_mass)) * m.normal * percent;
 
         body_a.position -= correction * body_a.inv_mass;
         body_b.position += correction * body_b.inv_mass;

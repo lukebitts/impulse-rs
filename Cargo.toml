@@ -1,12 +1,9 @@
 [package]
-name = "physics_engine"
+name = "impulse_rs"
 version = "0.1.0"
 authors = ["Lucas Bittencourt <lbittencs@gmail.com>"]
 
 [dependencies]
 cgmath = "0.15"
 ggez = "0.3.3"
-noisy_float = "0.1.2"
-
-[profile.release]
-debug = true
+rayon = "0.8.2"
